@@ -4,6 +4,10 @@
 // 4.一旦成功就不能失败 一旦失败不能成功
 // 5.当promise抛出异常后 也会走失败态
 
+import { rejects } from "assert"
+import { promises } from "fs"
+import { resolve } from "path"
+
 //Program 是支持链式调用的 
 /**
  * 无论是成功还是失败 都可以返回结果(1.出错了走错误2.返回一个普通值(非promise),就会作为下一次then的成功结果)
@@ -59,6 +63,9 @@ class Promise {
     onRejectCallbacks: Function[]
     static deferred:any
     static all:any
+    static allSettled?: (values: any[]) => Promise
+    finally!: (callback: any) => Promise
+    static race: (values: any) => Promise
 
     constructor (executor:(resolve:(value:unknown)=>void,reject:(reason:any)=>void)=>void){
         this.status = STATUS.pending
@@ -68,6 +75,9 @@ class Promise {
         this.onRejectCallbacks = []
 
         const resolve = (value?:any)=>{
+            if (value instanceof Promise){
+                return value.then(resolve,reject) // 循环调用resolve 防止返回还是promise
+            }
             if(this.status == STATUS.pending){ // 只有pengding状态才能修改状态
                 this.status = STATUS.fulfilled
                 this.value = value
@@ -90,7 +100,17 @@ class Promise {
             reject(e)
         }
     }
-    then(onFulfilled:any, onRejected:Function){
+    static resolve (value:unknown){
+        return new Promise((resolve,reject)=>{
+            resolve(value)
+        })
+    }
+    static reject (err:unknown){
+        return new Promise((resolve,reject)=>{
+            reject(err)
+        })
+    }
+    then(onFulfilled?:any, onRejected?:any){
         // 判断是不是函数 不是则重置返回一个函数  使不传参数的then也有返回值 .then().then(data=>data)
         onFulfilled = typeof onFulfilled == 'function' ? onFulfilled : (x:unknown) => x
         onRejected = typeof onRejected == 'function' ? onRejected : (err:unknown) => {throw err}
@@ -149,7 +169,9 @@ class Promise {
         this.then(null, errFn)
     }
 }
-
+// 延迟函数 不写这个 promise测试通不过
+// npm i promises-aplus-tests -g promise测试
+// promises-aplus-tests [js文件名] 即可验证你的Promise的规范。
 Promise.deferred = function () {
     let df = {} as any
     df.promise = new Promise((resolve, reject) => {
@@ -166,7 +188,7 @@ Promise.deferred = function () {
     }
     return false
   }
-  
+  // 执行数组中所有的promise 并且将结果按照顺序存入数组
   Promise.all = function(values:any[]){
     return new Promise((resolve,reject)=>{
       let arr = [] as any[]
@@ -188,5 +210,60 @@ Promise.deferred = function () {
       })
     })
   }
+  // 不管什么情况都会触发
+  // finally规则 resolve只返回自己的Promise  
+  // resolve情况 finally中resolve返回不修改最初值
+  // reject 情况 finally中reject返回会修改最初值 如果返回resolve则不影响
+  Promise.prototype.finally = function(callback){
+      return this.then((data: any)=>{
+        return Promise.resolve(callback()).then(()=>data)
+      },(err: any)=>{
+        return Promise.resolve(callback()).then(()=>{throw err})
+      })
+  }
+
+// promise.race() 返回第一个结果 跟all差不多
+  Promise.race = function(values){
+    return new Promise((resolve,reject)=>{
+        function collectResult(value:unknown){
+            resolve(value)
+        }
+        values.forEach((v:any)=>{
+            if(v && isPromise(v)) {
+                v.then((data:unknown)=>{
+                    collectResult(v)
+                },reject)
+            }else {
+                collectResult(v)
+            }
+        })
+    })
+  }
+  // promise.allSettled 无论成功失败执行完毕 按顺序返回所有结果（就是all方法一样）
+  Promise.allSettled = function(values:any[]){
+    return new Promise((resolve,reject)=>{
+        let arr = [] as any[],times = 0;
+        function collectResult(value: any, key: number, status: string){
+            arr[key] = status == 'fulfilled' ? {value,status} : {reason:value,status}
+            if (++times == values.length){
+                resolve(arr)
+            }
+        }
+        values.forEach((v:any,key:number)=>{
+            if(v && isPromise(v)){
+                v.then((data: any)=>{
+                    collectResult(data,key,'fulfilled')
+                },(reason: any)=>{
+                    collectResult(reason,key,'rejected')
+                })
+            }else {
+                collectResult(v,key,'noStatus')
+            }
+        })
+    })
+  }
+
+
+
 
   export default Promise

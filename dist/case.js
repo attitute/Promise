@@ -1,7 +1,9 @@
 
 
 
-const Promise =require('./bundle')
+const Promise = require('./bundle')
+let fs = require('fs');
+
 
 
 // 常用
@@ -12,7 +14,6 @@ const Promise =require('./bundle')
 // }).then((data)=>{
 //     console.log(data)
 // })
-
 // 异步返回resolve 或reject  发布订阅处理
 // let promise1 = new Promise((resolve,reject)=>{
 //     setTimeout(() => {
@@ -64,7 +65,7 @@ const Promise =require('./bundle')
 //     console.log(data)
 // })
 
-// 对象中then方法 then方法调用使用callthis指向 这样就不会调用get获取属性then得方法
+// 对象中then方法  将then函数取出 call指向x 不调用get属性取值操作 避免了下面的报错
 
 // let resultObj = {}
 // let index = 0;
@@ -93,7 +94,6 @@ const Promise =require('./bundle')
 // })
 
 // dedeferred 延迟对象
-let fs = require('fs');
 // Promise.deferred = function () {
 //     let dfd = {} as any;
 //     dfd.promise = new Promise((resolve,reject)=>{
@@ -102,31 +102,103 @@ let fs = require('fs');
 //     })
 //     return dfd;
 // }
-function read(url) {
-    let dfd = Promise.deferred(); // 延迟对象
-    fs.readFile(url, 'utf8', function(err, data) {
-        if (err) dfd.reject(err)
-        dfd.resolve(data);
-    })
-    return dfd.promise
-}
+// function read(url) {
+//     let dfd = Promise.deferred(); // 延迟对象
+//     fs.readFile(url, 'utf8', function(err, data) {
+//         if (err) dfd.reject(err)
+//         // console.log(data,'read')
+//         dfd.resolve(data);
+//     })
+//     return dfd.promise
+// }
 // read('./a.txt').then((data => {
-//     return read(data+'1');
+//     return read(data);
 // })).then(data => {
-//     console.log(data);
+//     console.log(data,'then1');
 // }).catch(err=>{
-//     console.log(err);
+//     console.log(err,'catch');
 // }).then(data=>{
-//     console.log(data);
+//     console.log(data,'then2');
 // });
 
 
-Promise.all([read('./a.txt'),read('./b.txt'),23]).then((data)=>{
+// ------promise.all
+
+// Promise.all([read('./a.txt'),read('./b.txt'),2,read('./c.txt')]).then(data=>{
+//     console.log(data,':then')
+// },(err)=>{
+//     console.log(err, 'err')
+// })
+
+
+// -----promise.finally
+ // finally规则 resolve只返回自己的Promise  
+ // resolve情况 finally中resolve返回不修改最初值
+ // reject 情况 finally中reject返回会修改最初值 如果返回resolve则不影响
+// Promise.reject('ok').finally(()=>{
+//     return new Promise((resolve,reject)=>{
+//         setTimeout(() => {
+//             resolve('err')
+//         }, 1000)
+//     })
+// }).then((data)=>{
+//     console.log(data,'data')
+// },(err)=>{
+//     console.log('err',err)
+// })
+
+// promise.race() 返回第一个结果
+
+// const promiser1 = new Promise((resolve,reject)=>{
+//     setTimeout(() => { 
+//         resolve('1')
+//     }, 1000);
+// })
+// const promiser2 = new Promise((resolve,reject)=>{
+//     setTimeout(() => {
+//         reject('2')
+//     }, 500);
+// })
+ 
+// Promise.race([promiser1,promiser2]).then(data=>{
+//     console.log('race:', data)
+// },(err)=>{
+//     console.log('err', err)
+// })
+
+// promise.race 使用场景 不要超时的返回结果 超时就不需要了
+
+
+// const promiser3 = new Promise((resolve,reject)=>{
+//     setTimeout(() => { 
+//         resolve('1')
+//     }, 2000);
+// })
+
+// function wrap(p){
+//     let abort;
+//     let p2 = new Promise((resolve,reject)=>{
+//         abort = reject
+//     })
+//     let p3 = Promise.race([p,p2])
+//     p3.abort = abort
+//     return p3
+// }
+// let p = wrap(promiser3)
+// setTimeout(() => {
+//     p.abort('fail')
+// }, 1000);
+// p.then((data)=>{
+//     console.log('data',data)
+// },(err)=>{
+//     console.log('err',err)
+// })
+
+
+// promise.allSettled([]) // 无论成功失败执行完毕 返回所有结果
+
+Promise.allSettled([promiser1,promiser2]).then(data=>{
     console.log(data)
 })
-
-
-
-
 
 

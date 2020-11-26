@@ -52,6 +52,9 @@ var Promise = /** @class */ (function () {
         this.onResloveCallbacks = [];
         this.onRejectCallbacks = [];
         var resolve = function (value) {
+            if (value instanceof Promise) {
+                return value.then(resolve, reject); // 循环调用resolve 防止返回还是promise
+            }
             if (_this.status == "PENDING" /* pending */) { // 只有pengding状态才能修改状态
                 _this.status = "FULFILLED" /* fulfilled */;
                 _this.value = value;
@@ -74,6 +77,16 @@ var Promise = /** @class */ (function () {
             reject(e);
         }
     }
+    Promise.resolve = function (value) {
+        return new Promise(function (resolve, reject) {
+            resolve(value);
+        });
+    };
+    Promise.reject = function (err) {
+        return new Promise(function (resolve, reject) {
+            reject(err);
+        });
+    };
     Promise.prototype.then = function (onFulfilled, onRejected) {
         var _this = this;
         // 判断是不是函数 不是则重置返回一个函数  使不传参数的then也有返回值 .then().then(data=>data)
@@ -139,6 +152,9 @@ var Promise = /** @class */ (function () {
     };
     return Promise;
 }());
+// 延迟函数 不写这个 promise测试通不过
+// npm i promises-aplus-tests -g promise测试
+// promises-aplus-tests [js文件名] 即可验证你的Promise的规范。
 Promise.deferred = function () {
     var df = {};
     df.promise = new Promise(function (resolve, reject) {
@@ -155,6 +171,7 @@ var isPromise = function (target) {
     }
     return false;
 };
+// 执行数组中所有的promise 并且将结果按照顺序存入数组
 Promise.all = function (values) {
     return new Promise(function (resolve, reject) {
         var arr = [];
@@ -173,6 +190,59 @@ Promise.all = function (values) {
             }
             else {
                 collectResult(value, key);
+            }
+        });
+    });
+};
+// 不管什么情况都会触发
+// finally规则 resolve只返回自己的Promise  
+// resolve情况 finally中resolve返回不修改最初值
+// reject 情况 finally中reject返回会修改最初值 如果返回resolve则不影响
+Promise.prototype.finally = function (callback) {
+    return this.then(function (data) {
+        return Promise.resolve(callback()).then(function () { return data; });
+    }, function (err) {
+        return Promise.resolve(callback()).then(function () { throw err; });
+    });
+};
+// promise.race() 返回第一个结果 跟all差不多
+Promise.race = function (values) {
+    return new Promise(function (resolve, reject) {
+        function collectResult(value) {
+            resolve(value);
+        }
+        values.forEach(function (v) {
+            if (v && isPromise(v)) {
+                v.then(function (data) {
+                    collectResult(v);
+                }, reject);
+            }
+            else {
+                collectResult(v);
+            }
+        });
+    });
+};
+// promise.allSettled 无论成功失败执行完毕 按顺序返回所有结果（就是all方法一样）
+Promise.allSettled = function (values) {
+    return new Promise(function (resolve, reject) {
+        var arr = [], times = 0;
+        function collectResult(value, key, status) {
+            arr[key] = status == 'fulfilled' ? { value: value, status: status } : { reason: value, status: status };
+            if (++times == values.length) {
+                resolve(arr);
+            }
+        }
+        values.forEach(function (v, key) {
+            if (v && isPromise(v)) {
+                v.then(function (data) {
+                    collectResult(data, key, 'fulfilled');
+                }, function (reason) {
+                    collectResult(reason, key, 'rejected');
+                });
+            }
+            else {
+                collectResult(v, key, 'noStatus');
             }
         });
     });
