@@ -14,19 +14,18 @@ const isObject: (target: any) => Boolean = (target: unknown) =>
 function resolvePromise(
   promise2: Promise,
   x: any,
-  resolve: Function,
+  resolve: (value:unknown)=>void,
   reject: Function
 ) {
-  if (x == promise2) reject(new TypeError('不能返回同一个promise'))
+  if (x == promise2) reject(new TypeError('不能返回同一个promise')) // 如果promise是一样的 状态一样就没有意义
   if (isObject(x) || typeof x == 'function') {
     let called = false
     try {
-      let then = x.then
+      let then = x.then // 获取then方法
       if (typeof then == 'function') {
-        then.call(
+        then.call( // 这样的好处在于不会触发 x的get属性获取方法
           x,
           (y: unknown) => {
-            // 运行返回的promise得then函数
             if (called) return
             called = true
             resolvePromise(promise2, y, resolve, reject) // 怕返回的还是promise再检查一次
@@ -60,7 +59,7 @@ class Promise {
   onResolveCallbacks: Function[] // 成功回调
   onRejectedCallbacks: Array<Function> // 失败回调
   static deferred?: any
-  constructor(executor: Function) {
+  constructor(executor: (resolve:(value:unknown)=>void, reject:(reason: unknown)=>void)=>void) {
     this.status = STATUS.pending
     this.value = undefined
     this.reason = undefined
@@ -94,7 +93,7 @@ class Promise {
     }
   }
   then(onFufilled?: any, onRejected?: any) {
-    // 传入成功失败回调
+    // 判断是不是函数 不是则重置返回一个函数
     onFufilled =
       typeof onFufilled == 'function' ? onFufilled : (x: unknown) => x
     onRejected =
@@ -103,14 +102,14 @@ class Promise {
         : (err: unknown) => {
             throw err
           }
-    let promise2 = new Promise((resolve: Function, reject: Function) => {
-      // 返回一个promise 支持链式调用
-      if (this.status == STATUS.fulfilled) {
-        setTimeout(() => {
+    // 返回一个promise 支持链式调用
+    let promise2 = new Promise((resolve: (value:unknown)=>void, reject: (reason:unknown)=>void) => {
+      if (this.status == STATUS.fulfilled) { // 状态是成功
+        setTimeout(() => { // 异步的好处在于能够获取到promise2
           try {
-            let x = onFufilled(this.value) // 回调函数中传入成功结果
+            let x = onFufilled(this.value) // 回调函数中传入成功结果 接受函数返回值
             // resolve(x)
-            resolvePromise(promise2, x, resolve, reject)
+            resolvePromise(promise2, x, resolve, reject) // 对返回值判断
           } catch (e) {
             reject(e)
           }
@@ -126,8 +125,9 @@ class Promise {
           }
         }, 0)
       }
+      // promise处于pending状态时 可能是还没调用成功或失败回调 将成功或失败函数发布 等待订阅
       if (this.status == STATUS.pending) {
-        // 订阅 成功失败的回调
+        // 发布
         this.onResolveCallbacks.push(() => {
             setTimeout(() => {
               try {
@@ -153,15 +153,14 @@ class Promise {
     })
     return promise2
   }
-  catch(errFn: () => void) {
+  catch(errFn: () => void) { // 只有错误返回的then方法
     return this.then(null, errFn)
   }
 }
-
-// -------------------------------
+// 延迟函数 拆分promise到一个对象中
 Promise.deferred = function () {
   let dfd = {} as any
-  dfd.promise = new Promise((resolve: () => void, reject: () => void) => {
+  dfd.promise = new Promise((resolve: (value:unknown) => void, reject: (reason:unknown) => void) => {
     dfd.resolve = resolve
     dfd.reject = reject
   })

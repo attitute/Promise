@@ -64,7 +64,7 @@ const Promise =require('./bundle')
 //     console.log(data)
 // })
 
-// 对象中then方法 实现啥
+// 对象中then方法 then方法调用使用callthis指向 这样就不会调用get获取属性then得方法
 
 // let resultObj = {}
 // let index = 0;
@@ -110,12 +110,23 @@ function read(url) {
     })
     return dfd.promise
 }
-read('./a.txt').then((data => {
-    return read(data+'1');
-})).then(data => {
-    console.log(data);
-}).catch(err=>{
-    console.log(err);
-}).then(data=>{
-    console.log(data);
-});
+// read('./a.txt').then((data => {
+//     return read(data+'1');
+// })).then(data => {
+//     console.log(data);
+// }).catch(err=>{
+//     console.log(err);
+// }).then(data=>{
+//     console.log(data);
+// });
+
+
+Promise.all([read('./a.txt'),read('./b.txt'),23]).then((data)=>{
+    console.log(data)
+})
+
+
+
+
+
+
