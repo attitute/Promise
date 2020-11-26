@@ -1,7 +1,8 @@
 
 
 
-const Promise =require('./bundle')
+const Promise = require('./bundle')
+
 
 
 // 常用
@@ -12,7 +13,6 @@ const Promise =require('./bundle')
 // }).then((data)=>{
 //     console.log(data)
 // })
-
 // 异步返回resolve 或reject  发布订阅处理
 // let promise1 = new Promise((resolve,reject)=>{
 //     setTimeout(() => {
@@ -64,7 +64,7 @@ const Promise =require('./bundle')
 //     console.log(data)
 // })
 
-// 对象中then方法 实现啥
+// 对象中then方法  then函数取出call指向x 不调用get属性取值操作 避免了下面的报错
 
 // let resultObj = {}
 // let index = 0;
@@ -93,7 +93,7 @@ const Promise =require('./bundle')
 // })
 
 // dedeferred 延迟对象
-let fs = require('fs');
+// let fs = require('fs');
 // Promise.deferred = function () {
 //     let dfd = {} as any;
 //     dfd.promise = new Promise((resolve,reject)=>{
@@ -102,20 +102,45 @@ let fs = require('fs');
 //     })
 //     return dfd;
 // }
-function read(url) {
-    let dfd = Promise.deferred(); // 延迟对象
-    fs.readFile(url, 'utf8', function(err, data) {
-        if (err) dfd.reject(err)
-        dfd.resolve(data);
+// function read(url) {
+//     let dfd = Promise.deferred(); // 延迟对象
+//     fs.readFile(url, 'utf8', function(err, data) {
+//         if (err) dfd.reject(err)
+//         // console.log(data,'read')
+//         dfd.resolve(data);
+//     })
+//     return dfd.promise
+// }
+// read('./a.txt').then((data => {
+//     return read(data);
+// })).then(data => {
+//     console.log(data,'then1');
+// }).catch(err=>{
+//     console.log(err,'catch');
+// }).then(data=>{
+//     console.log(data,'then2');
+// });
+
+
+// ------promise.all
+
+// Promise.all([read('./a.txt'),read('./b.txt'),2,read('./c.txt')]).then(data=>{
+//     console.log(data,':then')
+// },(err)=>{
+//     console.log(err, 'err')
+// })
+
+
+// -----promise.finally
+
+Promise.reject('ok').finally(()=>{
+    return new Promise((resolve,reject)=>{
+        setTimeout(() => {
+            reject('err')
+        }, 1000);
     })
-    return dfd.promise
-}
-read('./a.txt').then((data => {
-    return read(data+'1');
-})).then(data => {
-    console.log(data);
-}).catch(err=>{
-    console.log(err);
-}).then(data=>{
-    console.log(data);
-});
+}).then((data)=>{
+    console.log(data,'data')
+},(err)=>{
+    console.log('err',err)
+})
